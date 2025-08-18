@@ -102,6 +102,11 @@ More at: https://support.google.com/mail/answer/7190
         action='store_true',
         help='Test mode: list emails that would be exported without actually exporting'
     )
+    output_group.add_argument(
+        '--keep-quotes',
+        action='store_true',
+        help='Keep quoted text from replies (default: remove quotes)'
+    )
     
     args = parser.parse_args()
     
@@ -347,7 +352,7 @@ def run_test_mode(service, query: str, max_results: Optional[int]) -> int:
     return 0
 
 
-def convert_to_markdown_content(email_data: Dict) -> str:
+def convert_to_markdown_content(email_data: Dict, remove_quotes: bool = False) -> str:
     """Convert email to markdown with frontmatter."""
     lines = []
     
@@ -396,12 +401,16 @@ def convert_to_markdown_content(email_data: Dict) -> str:
         lines.append('## Content')
         lines.append('')
         markdown_body = html_to_markdown(email_data['body_html'])
+        if remove_quotes:
+            markdown_body = remove_quoted_text(markdown_body)
         lines.append(markdown_body)
     elif email_data['body_plain']:
         lines.append('## Content')
         lines.append('')
         # Convert plain text to markdown (escape special characters)
         plain_body = email_data['body_plain']
+        if remove_quotes:
+            plain_body = remove_quoted_text(plain_body)
         # Basic formatting for plain text
         plain_body = re.sub(r'^(\w.+)$', r'**\1**', plain_body, flags=re.MULTILINE)
         lines.append(plain_body)
@@ -490,6 +499,83 @@ def clean_markdown(content: str) -> str:
         content = re.sub(pattern, '[link]', content)
     
     return content.strip()
+
+
+def remove_quoted_text(content: str) -> str:
+    """Remove quoted text from email replies, keeping only new content."""
+    if not content:
+        return content
+    
+    lines = content.split('\n')
+    filtered_lines = []
+    in_quote_block = False
+    quote_indicators_found = False
+    
+    # Common patterns that indicate start of quoted content
+    quote_start_patterns = [
+        r'^On .+ wrote:',  # "On [date], [person] wrote:"
+        r'^From:.*',  # Outlook-style quote headers
+        r'^-----Original (Message|Appointment)-----',
+        r'^\*{0,2}From:\*{0,2}',  # Bold From: headers
+        r'^_{10,}',  # Long underscores
+        r'^-{10,}',  # Long dashes
+        r'^\s*>+',  # Traditional quote markers
+    ]
+    
+    # Patterns that indicate we're in a quote block
+    quote_block_patterns = [
+        r'^\s*>',  # Lines starting with >
+        r'^\s*\|',  # Table formatting in quotes
+    ]
+    
+    for i, line in enumerate(lines):
+        # Check if this line starts a quote block
+        is_quote_start = False
+        for pattern in quote_start_patterns:
+            if re.match(pattern, line, re.IGNORECASE):
+                is_quote_start = True
+                in_quote_block = True
+                quote_indicators_found = True
+                break
+        
+        # Check if we're in a quote block
+        if not is_quote_start and in_quote_block:
+            # Check if line is part of quote formatting
+            is_quote_line = False
+            for pattern in quote_block_patterns:
+                if re.match(pattern, line):
+                    is_quote_line = True
+                    break
+            
+            # If we hit a line that doesn't look like a quote and we've seen quotes,
+            # we might be in nested quotes, so stay in quote mode
+            if not is_quote_line and line.strip() and not line.strip().startswith('>'):
+                # Check if this might be new content after quotes
+                # Look for signatures or new content patterns
+                if i > 0 and not lines[i-1].strip():
+                    # Empty line before might indicate new content
+                    # But be careful of email signatures
+                    if not re.match(r'^(Regards|Best|Thanks|Sincerely|Cheers)', line, re.IGNORECASE):
+                        # This might still be quoted content
+                        pass
+        
+        # Skip lines that are clearly quoted
+        if line.strip().startswith('>'):
+            in_quote_block = True
+            continue
+            
+        # If we haven't found any quotes yet, or this isn't a quote line, keep it
+        if not in_quote_block:
+            filtered_lines.append(line)
+    
+    # If we removed quotes, clean up extra whitespace
+    if quote_indicators_found:
+        result = '\n'.join(filtered_lines)
+        # Remove excessive blank lines
+        result = re.sub(r'\n{3,}', '\n\n', result)
+        return result.strip()
+    
+    return content
 
 
 def sanitize_filename(filename: str, max_length: int = 100) -> str:
@@ -595,8 +681,8 @@ def main():
             email_data = fetch_email_content(service, email_id)
             
             if email_data:
-                # Convert to markdown
-                markdown_content = convert_to_markdown_content(email_data)
+                # Convert to markdown (remove quotes by default unless --keep-quotes is used)
+                markdown_content = convert_to_markdown_content(email_data, remove_quotes=not args.keep_quotes)
                 
                 # Save to file
                 try:

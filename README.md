@@ -7,6 +7,7 @@ Export emails from Gmail and convert them to Markdown files with full metadata p
 - **Gmail Search Syntax**: Use Gmail's native search operators for powerful filtering
 - **Test Mode**: Preview emails before exporting with `--test` flag
 - **Simple Email Filter**: Quick `--email` option searches both from and to fields
+- **Smart Quote Removal**: Automatically removes quoted reply text (use `--keep-quotes` to preserve)
 - **Clean Markdown**: Convert HTML emails to clean Markdown format
 - **Metadata Preservation**: YAML frontmatter with full email metadata
 - **Smart Organization**: Organized file structure for easy browsing
@@ -140,6 +141,7 @@ Remove --test flag to export these emails to markdown.
 | `--days N` | Number of days in the past | `--days 30` |
 | `--label LABEL` | Filter by Gmail label | `--label important` |
 | `--test` | Test mode - preview without export | `--test` |
+| `--keep-quotes` | Keep quoted text from replies (default: remove) | `--keep-quotes` |
 | `--max-emails N` | Limit number of emails | `--max-emails 50` |
 | `--output-dir DIR` | Output directory (default: exports) | `--output-dir my_exports` |
 
@@ -159,6 +161,7 @@ exports/
 Each markdown file contains:
 - YAML frontmatter with metadata (subject, from, to, cc, date, attachments)
 - Email content converted to clean Markdown
+- Automatic removal of quoted reply text (by default)
 - Automatic removal of tracking pixels and footer cruft
 
 ## Example Output
@@ -211,6 +214,19 @@ python gmail_to_markdown.py --email colleague@company.com --days 90
 ```bash
 # Export newsletters, excluding unsubscribe footers
 python gmail_to_markdown.py --query "from:newsletter@example.com -unsubscribe" --days 30
+```
+
+### Quote Handling
+
+```bash
+# Default: Export emails WITHOUT quoted text (clean, readable)
+python gmail_to_markdown.py --email colleague@company.com --days 30
+
+# Keep full email threads with all quotes
+python gmail_to_markdown.py --email colleague@company.com --days 30 --keep-quotes
+
+# Useful for preserving complete context
+python gmail_to_markdown.py --query "subject:RE OR subject:Re" --days 7 --keep-quotes
 ```
 
 ### Export by Label
