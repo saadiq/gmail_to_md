@@ -11,18 +11,23 @@ Export emails from Gmail and convert them to Markdown files with full metadata p
 - **Clean Markdown**: Convert HTML emails to clean Markdown format
 - **Metadata Preservation**: YAML frontmatter with full email metadata
 - **Smart Organization**: Organized file structure for easy browsing
-- **OAuth Reuse**: Leverages existing newsletter_summary OAuth setup
+- **OAuth Flexibility**: Auto-detects existing credentials or guides through new setup
 
 ## Setup
 
 ### Prerequisites
 
 1. Python 3.7 or higher
-2. Gmail API credentials (`credentials.json`)
+2. A Google account with Gmail
+3. Google Cloud project with Gmail API enabled (see setup below)
 
 ### Installation
 
 ```bash
+# Clone or download this project
+git clone <your-repo-url>
+cd gmail_to_md
+
 # Create virtual environment
 python3 -m venv venv
 
@@ -35,13 +40,81 @@ venv\Scripts\activate  # On Windows
 pip install -r requirements.txt
 ```
 
-### OAuth Setup
+### Gmail OAuth Setup
 
-This tool leverages the same Gmail OAuth setup as the `newsletter_summary` project:
+You need to set up OAuth credentials to allow the tool to read your Gmail. Choose either Option A (Web Console) or Option B (gcloud CLI):
 
-1. If you have `../newsletter_summary/credentials.json`, the tool will use it automatically
-2. If you have `../newsletter_summary/token.json`, it will also be reused
-3. Otherwise, copy `credentials.json` from the newsletter_summary project or follow [Google's OAuth setup guide](https://developers.google.com/gmail/api/quickstart/python)
+#### Option A: Using Google Cloud Console (Web UI)
+
+1. **Create a Google Cloud Project**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Click "Select a project" → "New Project"
+   - Name it (e.g., "Gmail to Markdown") and click "Create"
+
+2. **Enable Gmail API**
+   - In the project dashboard, go to "APIs & Services" → "Library"
+   - Search for "Gmail API"
+   - Click on it and press "Enable"
+
+3. **Configure OAuth Consent Screen**
+   - Go to "APIs & Services" → "OAuth consent screen"
+   - Choose "External" (unless you have a Google Workspace account)
+   - Fill in required fields:
+     - App name: "Gmail to Markdown"
+     - User support email: Your email
+     - Developer contact: Your email
+   - Click "Save and Continue"
+   - On Scopes screen, click "Add or Remove Scopes"
+   - Search for and select `https://www.googleapis.com/auth/gmail.readonly`
+   - Click "Update" → "Save and Continue"
+   - Add your email as a test user (if in testing mode)
+   - Click "Save and Continue"
+
+4. **Create OAuth Credentials**
+   - Go to "APIs & Services" → "Credentials"
+   - Click "Create Credentials" → "OAuth client ID"
+   - Application type: "Desktop app"
+   - Name: "Gmail to Markdown Client"
+   - Click "Create"
+   - Click "Download JSON"
+   - **Save the file as `credentials.json` in the project directory**
+
+#### Option B: Using gcloud CLI
+
+```bash
+# Install gcloud CLI if you haven't already
+# See: https://cloud.google.com/sdk/docs/install
+
+# Authenticate with Google Cloud
+gcloud auth login
+
+# Create a new project
+gcloud projects create gmail-to-markdown-$(date +%s) \
+  --name="Gmail to Markdown"
+
+# Set it as current project
+gcloud config set project [PROJECT_ID]
+
+# Enable Gmail API
+gcloud services enable gmail.googleapis.com
+
+# Note: OAuth client creation for desktop apps still requires the Console
+# After running the above commands:
+# 1. Go to https://console.cloud.google.com
+# 2. Select your project
+# 3. Navigate to "APIs & Services" → "Credentials"
+# 4. Follow steps 3-4 from Option A above
+```
+
+#### First-Time Authentication
+
+When you first run the tool:
+1. It will open a browser window
+2. Log in with your Google account
+3. Grant permission to "View your email messages and settings"
+4. The tool saves a `token.json` file for future use
+
+**Note**: If you already have credentials from another project (like newsletter_summary), the tool will detect and use them from `../newsletter_summary/`
 
 ## Usage
 
@@ -238,17 +311,66 @@ python gmail_to_markdown.py --query "label:project-x" --days 365
 
 ## Troubleshooting
 
+### OAuth Setup Issues
+
+**"credentials.json not found"**
+- Make sure you downloaded the OAuth client JSON from Google Cloud Console
+- Rename the downloaded file (usually `client_secret_*.json`) to `credentials.json`
+- Place it in the same directory as `gmail_to_markdown.py`
+
+**"Access blocked: This app's request is invalid"**
+- You need to configure the OAuth consent screen first
+- Go to APIs & Services → OAuth consent screen in Google Cloud Console
+- Add the Gmail readonly scope: `https://www.googleapis.com/auth/gmail.readonly`
+- Add your email as a test user if the app is in testing mode
+
+**"Error 400: redirect_uri_mismatch"**
+- Make sure you created a "Desktop app" OAuth client, not a "Web application"
+- If you accidentally created the wrong type, delete it and create a new one
+
+**Browser doesn't open for authentication**
+- Run the script from a terminal with GUI access
+- On remote servers, you may need to use SSH with X11 forwarding
+- Alternative: Run the script locally first to generate `token.json`, then copy it to the server
+
 ### Authentication Issues
-1. Ensure `credentials.json` exists (copy from `../newsletter_summary/` if available)
-2. Delete `token.json` to re-authenticate if you encounter token errors
-3. Make sure Gmail API is enabled in your Google Cloud Console
+
+**"Token has been expired or revoked"**
+- Delete `token.json` and run the script again to re-authenticate
+- This happens if you haven't used the tool in a while or revoked access
+
+**"insufficient authentication scopes"**
+- The token was created with different permissions
+- Delete `token.json` and re-authenticate
+- Make sure the Gmail readonly scope is enabled in your OAuth consent screen
 
 ### No Emails Found
-1. Use `--test` mode to verify your query
-2. Check Gmail web interface with the same search query
-3. Verify the time range with `--days`
+
+**Check your query**
+```bash
+# Test with a simple query first
+python gmail_to_markdown.py --email your@email.com --days 30 --test
+
+# Verify in Gmail web interface
+# Copy the query from the script output and paste it in Gmail search
+```
+
+**Common issues:**
+- Email address typos or wrong domain
+- Time range too narrow (try `--days 90` for testing)
+- Emails might be in Spam or Trash (not searched by default)
 
 ### Export Errors
-1. Check file system permissions for the output directory
-2. Ensure sufficient disk space
-3. Some emails with corrupted content may fail - the script will continue with others
+
+**"Permission denied" when saving files**
+- Check write permissions for the output directory
+- Try a different output directory: `--output-dir ~/Desktop/exports`
+
+**"File name too long" errors**
+- Email subjects with special characters might cause issues
+- The script automatically sanitizes filenames, but very long subjects are truncated
+
+**HTML parsing warnings**
+- Some emails have malformed HTML
+- The script will still extract text content
+- Look for `[Plain text extraction]` markers in the output
