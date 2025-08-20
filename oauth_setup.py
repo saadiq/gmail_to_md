@@ -47,7 +47,8 @@ class OAuthSetup:
             Tuple of (success, output)
         """
         try:
-            cmd = ['gcloud'] + command.split()
+            import shlex
+            cmd = ['gcloud'] + shlex.split(command)
             if capture_output:
                 result = subprocess.run(cmd, capture_output=True, text=True, check=False)
                 return result.returncode == 0, result.stdout + result.stderr
@@ -106,8 +107,9 @@ class OAuthSetup:
         
         if not success:
             print(f"Creating new project '{project_id}'...")
+            # Use a generic display name since project is already account-specific
             success, output = self.run_gcloud_command(
-                f"projects create {project_id} --name='Gmail Export {account_name.title()}'"
+                f'projects create {project_id} --name="Gmail Export"'
             )
             if not success:
                 print(f"Failed to create project: {output}")
