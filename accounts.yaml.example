@@ -1,0 +1,45 @@
+# Gmail to Markdown - Multi-Account Configuration Example
+# 
+# Copy this file to 'accounts.yaml' and customize with your accounts
+# Each account needs:
+#   - A unique nickname (used in commands)
+#   - Email address
+#   - Optional description
+#   - Paths to credentials and token files
+
+accounts:
+  # Example personal Gmail account
+  personal:
+    email: your.personal@gmail.com
+    description: "Personal Gmail Account"
+    credentials_file: credentials/personal_credentials.json
+    token_file: tokens/personal_token.json
+  
+  # Example work account
+  work:
+    email: your.name@company.com
+    description: "Work Email"
+    credentials_file: credentials/work_credentials.json
+    token_file: tokens/work_token.json
+  
+  # Example newsletter archive account
+  newsletters:
+    email: newsletters@gmail.com
+    description: "Newsletter Archive"
+    credentials_file: credentials/newsletters_credentials.json
+    token_file: tokens/newsletters_token.json
+
+# To set up each account:
+# 1. Run: python gmail_to_markdown.py --setup-account
+# 2. Follow the interactive prompts
+# 3. Set up OAuth credentials using one of:
+#    - Google Cloud Console (Web UI)
+#    - gcloud CLI
+#    - Existing credentials.json file
+# 4. Authenticate by running: python gmail_to_markdown.py --account [nickname] --test
+
+# Usage examples:
+# - Interactive selection: python gmail_to_markdown.py --days 7
+# - Single account: python gmail_to_markdown.py --account personal --days 7
+# - Multiple accounts: python gmail_to_markdown.py --accounts personal,work --days 30
+# - All accounts: python gmail_to_markdown.py --all-accounts --days 30

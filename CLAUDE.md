@@ -19,7 +19,7 @@ Gmail to Markdown Exporter - A Python tool that extracts emails from Gmail and c
 2. **auth.py** - OAuth authentication manager
    - Handles Gmail API authentication flow
    - Token persistence and refresh
-   - Credential detection from local or ../newsletter_summary/
+   - Credential detection from local directory
 
 3. **html_to_markdown.py** - HTML to Markdown conversion (imported dependency)
    - Converts HTML email bodies to clean Markdown
@@ -112,7 +112,7 @@ exports/
 ## Error Handling
 
 - Graceful OAuth token refresh
-- Fallback credential detection from ../newsletter_summary/
+- Local credential detection and validation
 - HTML parsing fallback to plain text extraction
 - Comprehensive error messages with actionable fixes
 

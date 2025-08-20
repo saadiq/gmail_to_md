@@ -114,7 +114,7 @@ When you first run the tool:
 3. Grant permission to "View your email messages and settings"
 4. The tool saves a `token.json` file for future use
 
-**Note**: If you already have credentials from another project (like newsletter_summary), the tool will detect and use them from `../newsletter_summary/`
+**Note**: The tool stores authentication tokens locally for future use
 
 ## Usage
 
