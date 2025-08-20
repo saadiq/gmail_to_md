@@ -92,7 +92,13 @@ class OAuthSetup:
             input()
         
         # Step 2: Create or select project
-        project_id = f"gmail-export-{account_name}".replace('_', '-').lower()
+        # Sanitize project ID: replace dots and underscores with hyphens, ensure valid format
+        sanitized_name = account_name.replace('.', '-').replace('_', '-').lower()
+        # Remove consecutive hyphens and ensure it starts with a letter
+        sanitized_name = '-'.join(filter(None, sanitized_name.split('-')))
+        if sanitized_name and not sanitized_name[0].isalpha():
+            sanitized_name = 'g-' + sanitized_name
+        project_id = f"gmail-export-{sanitized_name}"[:30]  # Max 30 chars
         print(f"\nStep 2: Setting up project '{project_id}'...")
         
         # Check if project exists
