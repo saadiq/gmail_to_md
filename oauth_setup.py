@@ -83,14 +83,43 @@ class OAuthSetup:
         print(f"Email: {email}")
         print()
         
-        # Step 1: Check authentication
+        # Step 1: Check authentication and switch to correct account
         print("Step 1: Checking gcloud authentication...")
-        success, output = self.run_gcloud_command('auth list')
-        if not success or 'No credentialed accounts' in output:
-            print("You need to authenticate with gcloud first.")
-            print("Run: gcloud auth login")
-            print("\nPress Enter after authentication is complete...")
-            input()
+        
+        # Get current active account
+        success, current_account = self.run_gcloud_command('config get-value account')
+        current_account = current_account.strip()
+        
+        # Check if we need to switch accounts
+        if current_account != email:
+            print(f"Current gcloud account: {current_account}")
+            print(f"Target email: {email}")
+            
+            # Check if target email is already authenticated
+            success, auth_list = self.run_gcloud_command('auth list')
+            
+            if email in auth_list:
+                print(f"Switching to account {email}...")
+                success, _ = self.run_gcloud_command(f'config set account {email}')
+                if success:
+                    print(f"Switched to {email}")
+                else:
+                    print(f"Failed to switch to {email}")
+                    return None
+            else:
+                print(f"\nAccount {email} is not authenticated with gcloud.")
+                print(f"Please authenticate with the correct account:")
+                print(f"\n  gcloud auth login {email}")
+                print("\nPress Enter after authentication is complete...")
+                input()
+                
+                # Switch to the newly authenticated account
+                success, _ = self.run_gcloud_command(f'config set account {email}')
+                if not success:
+                    print(f"Failed to switch to {email}")
+                    return None
+        else:
+            print(f"Already using correct account: {email}")
         
         # Step 2: Create or select project
         # Sanitize project ID: replace dots and underscores with hyphens, ensure valid format
@@ -100,7 +129,9 @@ class OAuthSetup:
         if sanitized_name and not sanitized_name[0].isalpha():
             sanitized_name = 'g-' + sanitized_name
         project_id = f"gmail-export-{sanitized_name}"[:30]  # Max 30 chars
-        print(f"\nStep 2: Setting up project '{project_id}'...")
+        print(f"\nStep 2: Setting up project...")
+        print(f"  Project ID: {project_id}")
+        print(f"  Display Name: Gmail Export")
         
         # Check if project exists
         success, _ = self.run_gcloud_command(f"projects describe {project_id}")
