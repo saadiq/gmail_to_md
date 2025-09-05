@@ -122,13 +122,19 @@ When you first run the tool:
 ### Quick Start
 
 ```bash
-# Export emails from/to a specific address
+# Export emails from/to a specific address (last 7 days)
 python gmail_to_markdown.py --email alice@example.com --days 7
+
+# Export ALL emails from/to a specific address (no date limit)
+python gmail_to_markdown.py --email alice@example.com
 
 # Test mode - preview what would be exported
 python gmail_to_markdown.py --email bob@example.com --days 30 --test
 
-# Use Gmail's search syntax directly
+# Use Gmail's search syntax directly (no date limit)
+python gmail_to_markdown.py --query "from:newsletter@example.com"
+
+# Combine with --days for convenience
 python gmail_to_markdown.py --query "from:newsletter@example.com" --days 30
 ```
 
@@ -212,7 +218,7 @@ Remove --test flag to export these emails to markdown.
 |--------|-------------|---------|
 | `--email EMAIL` | Filter emails from or to this address | `--email alice@example.com` |
 | `--query QUERY` | Gmail search query | `--query "from:@company.com"` |
-| `--days N` | Number of days in the past | `--days 30` |
+| `--days N` | Number of days in the past (optional) | `--days 30` |
 | `--label LABEL` | Filter by Gmail label | `--label important` |
 | `--test` | Test mode - preview without export | `--test` |
 | `--keep-quotes` | Keep quoted text from replies (default: remove) | `--keep-quotes` |
@@ -309,8 +315,11 @@ python gmail_to_markdown.py --email alice@example.com --query "has:attachment" -
 ### Export Conversations
 
 ```bash
-# Export all emails in conversations with someone
+# Export all emails in conversations with someone (last 90 days)
 python gmail_to_markdown.py --email colleague@company.com --days 90
+
+# Export ALL emails ever exchanged with someone
+python gmail_to_markdown.py --email colleague@company.com
 ```
 
 ### Archive Newsletters

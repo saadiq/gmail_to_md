@@ -58,13 +58,19 @@ pip install -r requirements.txt
 ### Running the Tool
 
 ```bash
-# Basic usage - export emails from/to an address
+# Basic usage - export emails from/to an address (last 30 days)
 python gmail_to_markdown.py --email user@example.com --days 30
+
+# Export ALL emails from/to an address (no date limit)
+python gmail_to_markdown.py --email user@example.com
 
 # Test mode - preview without exporting
 python gmail_to_markdown.py --email user@example.com --days 7 --test
 
-# Advanced Gmail query
+# Advanced Gmail query (no date limit)
+python gmail_to_markdown.py --query "from:@company.com has:attachment"
+
+# Gmail query with date limit
 python gmail_to_markdown.py --query "from:@company.com has:attachment" --days 30
 
 # Keep quoted text in replies

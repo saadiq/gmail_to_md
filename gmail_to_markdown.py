@@ -1021,9 +1021,6 @@ def main():
         if not args.email and not args.query:
             print("Error: Either --email or --query must be specified")
             return 1
-        if not args.days:
-            print("Error: --days must be specified")
-            return 1
         
         print("Running in legacy single-account mode...")
         print("Consider setting up multi-account support with --setup-account")
@@ -1058,9 +1055,6 @@ def main():
     # Validate query parameters
     if not args.email and not args.query:
         print("Error: Either --email or --query must be specified")
-        return 1
-    if not args.days:
-        print("Error: --days must be specified")
         return 1
     
     # Process each selected account
