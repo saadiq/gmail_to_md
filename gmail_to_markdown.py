@@ -167,6 +167,11 @@ More at: https://support.google.com/mail/answer/7190
         action='store_true',
         help='Keep quoted text from replies (default: remove quotes)'
     )
+    output_group.add_argument(
+        '--organize',
+        action='store_true',
+        help='Organize emails into subdirectories by filter/account (default: flat structure)'
+    )
     
     args = parser.parse_args()
     
@@ -649,7 +654,8 @@ def sanitize_filename(filename: str, max_length: int = 100) -> str:
 
 
 def save_email_to_file(email_data: Dict, markdown_content: str, output_dir: Path, 
-                       filter_value: str, account_info: Optional[Dict] = None) -> Path:
+                       filter_value: str, account_info: Optional[Dict] = None, 
+                       organize: bool = False) -> Path:
     """Save email to organized file structure."""
     # Parse date for folder structure
     try:
@@ -658,15 +664,18 @@ def save_email_to_file(email_data: Dict, markdown_content: str, output_dir: Path
     except:
         dt = datetime.datetime.now()
     
-    # Create folder structure
-    export_date = datetime.datetime.now().strftime('%Y-%m-%d')
-    
-    # Include account info in path if provided
-    if account_info:
-        account_folder = f"{account_info['nickname']}_{account_info['email']}"
-        folder_path = output_dir / f"{export_date}_export" / account_folder / sanitize_filename(filter_value)
+    # Create folder structure based on organize flag
+    if organize:
+        # With --organize: create subdirectories
+        if account_info:
+            # Use just nickname for cleaner folder names
+            folder_path = output_dir / account_info['nickname']
+        else:
+            # Use sanitized filter value for organization
+            folder_path = output_dir / sanitize_filename(filter_value)
     else:
-        folder_path = output_dir / f"{export_date}_export" / sanitize_filename(filter_value)
+        # Without --organize: flat structure directly in output_dir
+        folder_path = output_dir
     
     folder_path.mkdir(parents=True, exist_ok=True)
     
@@ -742,7 +751,7 @@ def process_single_account(service, args, account_info: Optional[Dict] = None) -
                 try:
                     file_path = save_email_to_file(
                         email_data, markdown_content, output_dir, 
-                        filter_value, account_info
+                        filter_value, account_info, organize=args.organize
                     )
                     saved_files.append(file_path)
                     successful += 1
