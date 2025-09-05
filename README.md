@@ -9,6 +9,7 @@ Export emails from Gmail and convert them to Markdown files with full metadata p
 - **Simple Email Filter**: Quick `--email` option searches both from and to fields
 - **Smart Quote Removal**: Automatically removes quoted reply text (use `--keep-quotes` to preserve)
 - **Clean Markdown**: Convert HTML emails to clean Markdown format
+- **Image Handling**: Download attachments and inline images with emails
 - **Metadata Preservation**: YAML frontmatter with full email metadata
 - **Smart Organization**: Organized file structure for easy browsing
 - **OAuth Flexibility**: Auto-detects existing credentials or guides through new setup
@@ -215,6 +216,8 @@ Remove --test flag to export these emails to markdown.
 | `--label LABEL` | Filter by Gmail label | `--label important` |
 | `--test` | Test mode - preview without export | `--test` |
 | `--keep-quotes` | Keep quoted text from replies (default: remove) | `--keep-quotes` |
+| `--download-images` | Download all images (inline and attachments) | `--download-images` |
+| `--image-size-limit N` | Max image size in MB to download (default: 10) | `--image-size-limit 20` |
 | `--max-emails N` | Limit number of emails | `--max-emails 50` |
 | `--output-dir DIR` | Output directory (default: exports) | `--output-dir my_exports` |
 
@@ -228,6 +231,13 @@ exports/
     └── email_or_query/
         ├── YYYY-MM-DD_HH-MM-SS_subject.md
         ├── YYYY-MM-DD_HH-MM-SS_another_subject.md
+        ├── attachments/              # When using --download-images
+        │   └── email_filename/
+        │       ├── document.pdf
+        │       └── image.jpg
+        ├── inline-images/            # When using --download-images
+        │   └── email_filename/
+        │       └── embedded_image.png
         └── ...
 ```
 
@@ -250,6 +260,7 @@ attachments:
   - filename: "report.pdf"
     type: "application/pdf"
     size: 245632
+    local_path: "attachments/email_filename/report.pdf"  # When using --download-images
 ---
 
 # Weekly Newsletter
@@ -265,6 +276,26 @@ Welcome to this week's newsletter...
 ```
 
 ## Tips & Tricks
+
+### Image Handling
+
+```bash
+# Download all images (attachments and inline images)
+python gmail_to_markdown.py --email colleague@company.com --days 30 --download-images
+
+# Download images with size limit
+python gmail_to_markdown.py --query "has:attachment" --days 7 --download-images --image-size-limit 20
+
+# Export without images (default behavior)
+python gmail_to_markdown.py --email newsletter@example.com --days 30
+```
+
+When using `--download-images`:
+- Attachments are saved to `attachments/` subdirectory
+- Inline images (embedded in HTML) are saved to `inline-images/` subdirectory
+- CID references (cid:) in HTML are replaced with local file paths
+- External image URLs remain unchanged in the Markdown
+- YAML frontmatter includes local paths for downloaded files
 
 ### Combining Filters
 

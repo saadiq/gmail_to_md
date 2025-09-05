@@ -172,6 +172,22 @@ More at: https://support.google.com/mail/answer/7190
         action='store_true',
         help='Organize emails into subdirectories by filter/account (default: flat structure)'
     )
+    output_group.add_argument(
+        '--download-images',
+        action='store_true',
+        help='Download all images (inline images and attachments)'
+    )
+    output_group.add_argument(
+        '--skip-images',
+        action='store_true',
+        help='Skip all image downloads (default behavior)'
+    )
+    output_group.add_argument(
+        '--image-size-limit',
+        type=int,
+        default=10,
+        help='Maximum image size to download in MB (default: 10MB)'
+    )
     
     args = parser.parse_args()
     
@@ -276,8 +292,8 @@ def fetch_email_headers(service, email_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def fetch_email_content(service, email_id: str) -> Optional[Dict[str, Any]]:
-    """Fetch full email content."""
+def fetch_email_content(service, email_id: str, download_attachments: bool = False) -> Optional[Dict[str, Any]]:
+    """Fetch full email content with optional attachment data."""
     try:
         msg = service.users().messages().get(
             userId='me',
@@ -298,7 +314,8 @@ def fetch_email_content(service, email_id: str) -> Optional[Dict[str, Any]]:
             'date': '',
             'body_html': '',
             'body_plain': '',
-            'attachments': []
+            'attachments': [],
+            'inline_images': {}  # Maps Content-ID to image data
         }
         
         for header in headers:
@@ -315,8 +332,8 @@ def fetch_email_content(service, email_id: str) -> Optional[Dict[str, Any]]:
             elif name == 'date':
                 email_data['date'] = value
         
-        # Extract body
-        extract_body_from_payload(payload, email_data)
+        # Extract body and attachments
+        extract_body_from_payload(payload, email_data, service, email_id, download_attachments)
         
         return email_data
     
@@ -325,11 +342,28 @@ def fetch_email_content(service, email_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def extract_body_from_payload(payload: Dict, email_data: Dict):
-    """Recursively extract body content from email payload."""
+def extract_body_from_payload(payload: Dict, email_data: Dict, service=None, email_id: str = None, download_attachments: bool = False):
+    """Recursively extract body content, attachments, and inline images from email payload."""
     if 'parts' in payload:
         for part in payload['parts']:
             mime_type = part.get('mimeType', '')
+            headers = part.get('headers', [])
+            
+            # Check for Content-ID (inline images)
+            content_id = None
+            content_disposition = None
+            for header in headers:
+                if header['name'].lower() == 'content-id':
+                    content_id = header['value'].strip('<>')
+                elif header['name'].lower() == 'content-disposition':
+                    content_disposition = header['value'].lower()
+            
+            # Determine if this is an inline image
+            is_inline_image = (
+                content_id and 
+                mime_type.startswith('image/') and 
+                (not content_disposition or 'inline' in content_disposition)
+            )
             
             if mime_type == 'text/html' and 'body' in part and 'data' in part['body']:
                 email_data['body_html'] = base64.urlsafe_b64decode(
@@ -340,14 +374,48 @@ def extract_body_from_payload(payload: Dict, email_data: Dict):
                     part['body']['data']
                 ).decode('utf-8', errors='ignore')
             elif mime_type.startswith('multipart/'):
-                extract_body_from_payload(part, email_data)
+                extract_body_from_payload(part, email_data, service, email_id, download_attachments)
+            elif is_inline_image and download_attachments and service and email_id:
+                # Handle inline image
+                attachment_id = part['body'].get('attachmentId')
+                if attachment_id:
+                    try:
+                        att = service.users().messages().attachments().get(
+                            userId='me',
+                            messageId=email_id,
+                            id=attachment_id
+                        ).execute()
+                        
+                        # Store inline image data
+                        email_data['inline_images'][content_id] = {
+                            'data': att['data'],
+                            'mimeType': mime_type,
+                            'filename': part.get('filename', f'{content_id}.{mime_type.split("/")[1]}')
+                        }
+                    except Exception as e:
+                        print(f"Error downloading inline image {content_id}: {str(e)}")
             elif 'filename' in part:
                 # Track attachments
-                email_data['attachments'].append({
+                attachment_info = {
                     'filename': part['filename'],
                     'mimeType': mime_type,
-                    'size': part['body'].get('size', 0)
-                })
+                    'size': part['body'].get('size', 0),
+                    'attachmentId': part['body'].get('attachmentId')
+                }
+                
+                # Download attachment data if requested
+                if download_attachments and service and email_id and attachment_info['attachmentId']:
+                    try:
+                        att = service.users().messages().attachments().get(
+                            userId='me',
+                            messageId=email_id,
+                            id=attachment_info['attachmentId']
+                        ).execute()
+                        attachment_info['data'] = att['data']
+                    except Exception as e:
+                        print(f"Error downloading attachment {attachment_info['filename']}: {str(e)}")
+                
+                email_data['attachments'].append(attachment_info)
     elif 'body' in payload and 'data' in payload['body']:
         # Single part message
         mime_type = payload.get('mimeType', '')
@@ -410,7 +478,7 @@ def run_test_mode(service, query: str, max_results: Optional[int], account_name:
     return len(emails)
 
 
-def convert_to_markdown_content(email_data: Dict, remove_quotes: bool = True) -> str:
+def convert_to_markdown_content(email_data: Dict, remove_quotes: bool = True, download_images: bool = False) -> str:
     """Convert email to markdown with frontmatter."""
     lines = []
     
@@ -437,6 +505,8 @@ def convert_to_markdown_content(email_data: Dict, remove_quotes: bool = True) ->
             lines.append(f"  - filename: {json.dumps(att['filename'])}")
             lines.append(f"    type: {json.dumps(att['mimeType'])}")
             lines.append(f"    size: {att['size']}")
+            if download_images and 'local_path' in att:
+                lines.append(f"    local_path: {json.dumps(att['local_path'])}")
     
     lines.append('---')
     lines.append('')
@@ -458,7 +528,9 @@ def convert_to_markdown_content(email_data: Dict, remove_quotes: bool = True) ->
     if email_data['body_html']:
         lines.append('## Content')
         lines.append('')
-        markdown_body = html_to_markdown(email_data['body_html'])
+        # Pass inline images to HTML converter if available
+        inline_images = email_data.get('inline_images', {}) if download_images else None
+        markdown_body = html_to_markdown(email_data['body_html'], inline_images)
         if remove_quotes:
             markdown_body = remove_quoted_text(markdown_body)
         lines.append(markdown_body)
@@ -480,14 +552,24 @@ def convert_to_markdown_content(email_data: Dict, remove_quotes: bool = True) ->
     return '\n'.join(lines)
 
 
-def html_to_markdown(html: str) -> str:
-    """Convert HTML to clean markdown."""
+def html_to_markdown(html: str, inline_images: Optional[Dict] = None) -> str:
+    """Convert HTML to clean markdown with CID replacement for inline images."""
     if not html:
         return "[Empty email content]"
     
     try:
         # Clean HTML first
         soup = BeautifulSoup(html, "html.parser")
+        
+        # Replace CID references with local paths if inline images were downloaded
+        if inline_images:
+            for img in soup.find_all('img'):
+                src = img.get('src', '')
+                if src.startswith('cid:'):
+                    cid = src[4:]  # Remove 'cid:' prefix
+                    if cid in inline_images and 'local_path' in inline_images[cid]:
+                        # Replace with local path
+                        img['src'] = inline_images[cid]['local_path']
         
         # Remove problematic tags
         for tag in soup(['style', 'script', 'meta', 'link', 'head']):
@@ -655,8 +737,15 @@ def sanitize_filename(filename: str, max_length: int = 100) -> str:
 
 def save_email_to_file(email_data: Dict, markdown_content: str, output_dir: Path, 
                        filter_value: str, account_info: Optional[Dict] = None, 
-                       organize: bool = False) -> Path:
-    """Save email to organized file structure."""
+                       organize: bool = False, download_images: bool = False,
+                       image_size_limit_mb: int = 10) -> Tuple[Path, List[Path]]:
+    """Save email to organized file structure with optional image downloads.
+    
+    Returns:
+        Tuple of (email_file_path, list_of_saved_image_paths)
+    """
+    saved_images = []
+    
     # Parse date for folder structure
     try:
         from email.utils import parsedate_to_datetime
@@ -693,10 +782,77 @@ def save_email_to_file(email_data: Dict, markdown_content: str, output_dir: Path
         file_path = folder_path / filename
         counter += 1
     
+    # Create subdirectories for images if downloading
+    if download_images and (email_data.get('attachments') or email_data.get('inline_images')):
+        # Use email filename without extension as base for image folder
+        email_base = file_path.stem
+        attachments_dir = folder_path / 'attachments' / email_base
+        inline_images_dir = folder_path / 'inline-images' / email_base
+        
+        # Save attachments
+        if email_data.get('attachments'):
+            attachments_dir.mkdir(parents=True, exist_ok=True)
+            for att in email_data['attachments']:
+                if 'data' in att:
+                    # Check size limit
+                    size_mb = att['size'] / (1024 * 1024)
+                    if size_mb <= image_size_limit_mb:
+                        att_filename = sanitize_filename(att['filename'])
+                        att_path = attachments_dir / att_filename
+                        
+                        # Handle duplicates
+                        att_counter = 1
+                        while att_path.exists():
+                            name_parts = att_filename.rsplit('.', 1)
+                            if len(name_parts) == 2:
+                                att_path = attachments_dir / f"{name_parts[0]}_{att_counter}.{name_parts[1]}"
+                            else:
+                                att_path = attachments_dir / f"{att_filename}_{att_counter}"
+                            att_counter += 1
+                        
+                        # Save attachment
+                        try:
+                            att_data = base64.urlsafe_b64decode(att['data'])
+                            att_path.write_bytes(att_data)
+                            saved_images.append(att_path)
+                            
+                            # Update attachment info with local path (relative to markdown file)
+                            att['local_path'] = str(att_path.relative_to(folder_path))
+                        except Exception as e:
+                            print(f"Error saving attachment {att['filename']}: {str(e)}")
+        
+        # Save inline images
+        if email_data.get('inline_images'):
+            inline_images_dir.mkdir(parents=True, exist_ok=True)
+            for cid, img_info in email_data['inline_images'].items():
+                img_filename = sanitize_filename(img_info['filename'])
+                img_path = inline_images_dir / img_filename
+                
+                # Handle duplicates
+                img_counter = 1
+                while img_path.exists():
+                    name_parts = img_filename.rsplit('.', 1)
+                    if len(name_parts) == 2:
+                        img_path = inline_images_dir / f"{name_parts[0]}_{img_counter}.{name_parts[1]}"
+                    else:
+                        img_path = inline_images_dir / f"{img_filename}_{img_counter}"
+                    img_counter += 1
+                
+                # Save inline image
+                try:
+                    img_data = base64.urlsafe_b64decode(img_info['data'])
+                    img_path.write_bytes(img_data)
+                    saved_images.append(img_path)
+                    
+                    # Store local path for CID replacement
+                    img_info['local_path'] = str(img_path.relative_to(folder_path))
+                except Exception as e:
+                    print(f"Error saving inline image {cid}: {str(e)}")
+    
     # Write file
     file_path.write_text(markdown_content, encoding='utf-8')
     
-    return file_path
+    return file_path, saved_images
 
 
 def process_single_account(service, args, account_info: Optional[Dict] = None) -> int:
@@ -734,26 +890,43 @@ def process_single_account(service, args, account_info: Optional[Dict] = None) -
     successful = 0
     failed = 0
     saved_files = []
+    saved_images_count = 0
+    
+    # Determine if we should download images
+    download_images = args.download_images and not args.skip_images
     
     desc = f"{account_prefix}Exporting emails" if account_name else "Exporting emails"
     with tqdm(total=len(email_ids), desc=desc, unit="email") as pbar:
         for email_id in email_ids:
-            # Fetch email content
-            email_data = fetch_email_content(service, email_id)
+            # Fetch email content with optional attachment downloads
+            email_data = fetch_email_content(service, email_id, download_images)
             
             if email_data:
-                # Convert to markdown
-                markdown_content = convert_to_markdown_content(
-                    email_data, remove_quotes=not args.keep_quotes
-                )
-                
-                # Save to file
+                # Convert to markdown (needs to happen AFTER saving to get local paths)
+                # First save to get local paths for images
                 try:
-                    file_path = save_email_to_file(
-                        email_data, markdown_content, output_dir, 
-                        filter_value, account_info, organize=args.organize
+                    # Save email and images first to get paths
+                    temp_markdown = convert_to_markdown_content(
+                        email_data, remove_quotes=not args.keep_quotes, download_images=False
                     )
+                    
+                    file_path, saved_images = save_email_to_file(
+                        email_data, temp_markdown, output_dir, 
+                        filter_value, account_info, organize=args.organize,
+                        download_images=download_images,
+                        image_size_limit_mb=args.image_size_limit
+                    )
+                    
+                    # Now regenerate markdown with correct image paths
+                    if download_images and saved_images:
+                        markdown_content = convert_to_markdown_content(
+                            email_data, remove_quotes=not args.keep_quotes, download_images=True
+                        )
+                        # Rewrite the file with updated paths
+                        file_path.write_text(markdown_content, encoding='utf-8')
+                    
                     saved_files.append(file_path)
+                    saved_images_count += len(saved_images)
                     successful += 1
                 except Exception as e:
                     print(f"\n{account_prefix}Error saving email {email_id}: {str(e)}")
@@ -768,6 +941,8 @@ def process_single_account(service, args, account_info: Optional[Dict] = None) -
     print(f"{account_prefix}Successfully exported: {successful} email(s)")
     if failed:
         print(f"{account_prefix}Failed: {failed} email(s)")
+    if saved_images_count > 0:
+        print(f"{account_prefix}Downloaded images: {saved_images_count}")
     
     if saved_files and account_info:
         export_folder = saved_files[0].parent.parent.parent

@@ -13,7 +13,9 @@ Gmail to Markdown Exporter - A Python tool that extracts emails from Gmail and c
 1. **gmail_to_markdown.py** - Main entry point that orchestrates the entire export process
    - Argument parsing and query building using Gmail's native search syntax
    - Email fetching via Gmail API (list, headers, full content)
+   - Attachment and inline image downloading via Gmail API
    - HTML to Markdown conversion with intelligent cleanup
+   - CID reference replacement for inline images
    - File organization and saving with structured directory hierarchy
 
 2. **auth.py** - OAuth authentication manager
@@ -33,6 +35,8 @@ Gmail to Markdown Exporter - A Python tool that extracts emails from Gmail and c
 4. Fetch matching email IDs from Gmail
 5. For each email:
    - Fetch full content (headers + body)
+   - Optionally download attachments and inline images (--download-images)
+   - Replace CID references in HTML with local image paths
    - Convert HTML body to Markdown
    - Remove quoted text (unless --keep-quotes)
    - Clean up tracking URLs and footer cruft
@@ -65,6 +69,12 @@ python gmail_to_markdown.py --query "from:@company.com has:attachment" --days 30
 
 # Keep quoted text in replies
 python gmail_to_markdown.py --email user@example.com --days 30 --keep-quotes
+
+# Download all images (attachments and inline)
+python gmail_to_markdown.py --email user@example.com --days 30 --download-images
+
+# Download with custom size limit
+python gmail_to_markdown.py --query "has:attachment" --days 7 --download-images --image-size-limit 20
 ```
 
 ### Common Query Patterns
@@ -94,7 +104,10 @@ python gmail_to_markdown.py --email user@example.com --days 30 --keep-quotes
 - **Quote Removal**: Intelligent detection of quoted reply text using multiple patterns (On...wrote, From:, >, etc.)
 - **HTML Cleanup**: Removes style/script tags, tracking pixels, and converts to clean Markdown
 - **Footer Detection**: Identifies and removes common footer patterns (unsubscribe, copyright, etc.)
-- **Attachment Tracking**: Records attachment metadata in YAML frontmatter
+- **Attachment Handling**: Downloads attachments and saves to organized directories (optional)
+- **Inline Images**: Extracts inline images with Content-ID, replaces CID references with local paths
+- **Image Size Limits**: Configurable size limit for downloaded images (default: 10MB)
+- **Metadata Tracking**: Records attachment and image info in YAML frontmatter with local paths
 
 ### File Organization
 
@@ -102,7 +115,14 @@ python gmail_to_markdown.py --email user@example.com --days 30 --keep-quotes
 exports/
 └── YYYY-MM-DD_export/
     └── sanitized_filter_value/
-        └── YYYY-MM-DD_HH-MM-SS_subject.md
+        ├── YYYY-MM-DD_HH-MM-SS_subject.md
+        ├── attachments/              # When --download-images is used
+        │   └── email_filename/
+        │       ├── document.pdf
+        │       └── spreadsheet.xlsx
+        └── inline-images/            # When --download-images is used
+            └── email_filename/
+                └── embedded_logo.png
 ```
 
 - Filenames are sanitized to be filesystem-safe
@@ -114,6 +134,8 @@ exports/
 - Graceful OAuth token refresh
 - Local credential detection and validation
 - HTML parsing fallback to plain text extraction
+- Failed attachment downloads logged but don't stop export
+- Image size limit enforcement with informative messages
 - Comprehensive error messages with actionable fixes
 
 ## Dependencies
