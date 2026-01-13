@@ -8,12 +8,12 @@ Provides multiple methods for setting up OAuth credentials:
 - Using existing credentials.json file
 """
 
-import os
 import json
-import subprocess
+import shlex
 import shutil
+import subprocess
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Tuple
 
 
 class OAuthSetup:
@@ -23,51 +23,28 @@ class OAuthSetup:
     
     @staticmethod
     def check_gcloud_installed() -> bool:
-        """Check if gcloud CLI is installed and available.
-        
-        Returns:
-            True if gcloud is available, False otherwise
-        """
+        """Check if gcloud CLI is installed and available."""
         try:
-            result = subprocess.run(['gcloud', '--version'], 
-                                  capture_output=True, text=True, check=False)
+            result = subprocess.run(
+                ['gcloud', '--version'], capture_output=True, text=True, check=False
+            )
             return result.returncode == 0
         except FileNotFoundError:
             return False
-    
+
     @staticmethod
-    def run_gcloud_command(command: str, capture_output: bool = True) -> Tuple[bool, str]:
-        """Run a gcloud command and return success status and output.
-        
-        Args:
-            command: The gcloud command to run (without 'gcloud' prefix)
-            capture_output: Whether to capture command output
-            
-        Returns:
-            Tuple of (success, output)
-        """
+    def run_gcloud_command(command: str, capture: bool = True) -> Tuple[bool, str]:
+        """Run a gcloud command and return (success, output)."""
         try:
-            import shlex
             cmd = ['gcloud'] + shlex.split(command)
-            if capture_output:
-                result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-                return result.returncode == 0, result.stdout + result.stderr
-            else:
-                result = subprocess.run(cmd, check=False)
-                return result.returncode == 0, ""
+            result = subprocess.run(cmd, capture_output=capture, text=True, check=False)
+            output = (result.stdout + result.stderr) if capture else ""
+            return result.returncode == 0, output
         except Exception as e:
             return False, str(e)
     
     def setup_with_gcloud(self, account_name: str, email: str) -> Optional[str]:
-        """Set up OAuth using gcloud CLI.
-        
-        Args:
-            account_name: Nickname for the account
-            email: Gmail email address
-            
-        Returns:
-            Path to credentials file if successful, None otherwise
-        """
+        """Set up OAuth using gcloud CLI."""
         print("\n=== gcloud CLI OAuth Setup ===\n")
         
         if not self.check_gcloud_installed():
@@ -183,15 +160,7 @@ class OAuthSetup:
         return self._get_credentials_file_path(account_name)
     
     def setup_with_console_guide(self, account_name: str, email: str) -> Optional[str]:
-        """Guide user through Web Console setup.
-        
-        Args:
-            account_name: Nickname for the account
-            email: Gmail email address
-            
-        Returns:
-            Path to credentials file if successful, None otherwise
-        """
+        """Guide user through Web Console setup."""
         print("\n=== Google Cloud Console Setup Guide ===\n")
         print(f"Setting up OAuth for account: {account_name} ({email})")
         print()
@@ -232,17 +201,8 @@ class OAuthSetup:
         
         return self._get_credentials_file_path(account_name)
     
-    def setup_with_existing_file(self, account_name: str, 
-                                source_path: str) -> Optional[str]:
-        """Set up using an existing credentials.json file.
-        
-        Args:
-            account_name: Nickname for the account
-            source_path: Path to existing credentials.json file
-            
-        Returns:
-            Path to copied credentials file if successful, None otherwise
-        """
+    def setup_with_existing_file(self, account_name: str, source_path: str) -> Optional[str]:
+        """Set up using an existing credentials.json file."""
         source = Path(source_path)
         
         if not source.exists():
@@ -280,14 +240,7 @@ class OAuthSetup:
             return None
     
     def _get_credentials_file_path(self, account_name: str) -> Optional[str]:
-        """Get credentials file path after user downloads it.
-        
-        Args:
-            account_name: Nickname for the account
-            
-        Returns:
-            Path to credentials file if successful, None otherwise
-        """
+        """Prompt user for downloaded credentials file path."""
         print("\nAfter downloading the credentials JSON file:")
         print("Enter the path to the downloaded file (or drag & drop): ", end='')
         
@@ -300,15 +253,7 @@ class OAuthSetup:
         return self.setup_with_existing_file(account_name, source_path)
     
     def interactive_setup(self, account_name: str, email: str) -> Optional[str]:
-        """Interactive OAuth setup with method selection.
-        
-        Args:
-            account_name: Nickname for the account
-            email: Gmail email address
-            
-        Returns:
-            Path to credentials file if successful, None otherwise
-        """
+        """Interactive OAuth setup with method selection."""
         print("\n=== OAuth Setup Method Selection ===\n")
         print("Choose your preferred setup method:")
         print("[1] Google Cloud Console (Web UI)")
@@ -335,43 +280,30 @@ class OAuthSetup:
             return None
     
     def validate_and_test_credentials(self, credentials_path: str) -> bool:
-        """Validate OAuth credentials file and optionally test authentication.
-        
-        Args:
-            credentials_path: Path to credentials.json file
-            
-        Returns:
-            True if credentials are valid
-        """
+        """Validate OAuth credentials file structure."""
         creds_file = Path(credentials_path)
-        
+
         if not creds_file.exists():
             print(f"Credentials file not found: {credentials_path}")
             return False
-        
+
         try:
-            with open(creds_file, 'r') as f:
-                data = json.load(f)
-                
-                # Check for required fields
-                if 'installed' in data:
-                    app_data = data['installed']
-                    required = ['client_id', 'client_secret', 'auth_uri', 'token_uri']
-                elif 'web' in data:
-                    app_data = data['web']
-                    required = ['client_id', 'client_secret', 'auth_uri', 'token_uri']
-                else:
-                    print("Invalid credentials format: missing 'installed' or 'web' section")
+            data = json.loads(creds_file.read_text())
+            app_data = data.get('installed') or data.get('web')
+
+            if not app_data:
+                print("Invalid credentials format: missing 'installed' or 'web' section")
+                return False
+
+            required = ['client_id', 'client_secret', 'auth_uri', 'token_uri']
+            for field in required:
+                if field not in app_data:
+                    print(f"Invalid credentials: missing '{field}'")
                     return False
-                
-                for field in required:
-                    if field not in app_data:
-                        print(f"Invalid credentials: missing '{field}'")
-                        return False
-                
-                print("✓ Credentials file is valid")
-                return True
-                
+
+            print("Credentials file is valid")
+            return True
+
         except json.JSONDecodeError:
             print("Invalid JSON in credentials file")
             return False
@@ -381,17 +313,9 @@ class OAuthSetup:
 
 
 def setup_oauth_for_account(account_name: str, email: str) -> bool:
-    """Complete OAuth setup process for an account.
-    
-    Args:
-        account_name: Nickname for the account
-        email: Gmail email address
-        
-    Returns:
-        True if setup was successful
-    """
+    """Complete OAuth setup process for an account."""
     setup = OAuthSetup()
-    
+
     # Check if credentials already exist
     creds_path = Path(f'credentials/{account_name}_credentials.json')
     if creds_path.exists():
@@ -399,33 +323,15 @@ def setup_oauth_for_account(account_name: str, email: str) -> bool:
         print("Overwrite? [y/N]: ", end='')
         if input().strip().lower() != 'y':
             return False
-    
-    # Run interactive setup
+
     result = setup.interactive_setup(account_name, email)
-    
+
     if result:
-        print(f"\n✓ OAuth credentials configured for account '{account_name}'")
+        print(f"\nOAuth credentials configured for account '{account_name}'")
         print(f"  Credentials saved to: {result}")
         print("\nNext step: Authenticate the account")
         print(f"Run: python gmail_to_markdown.py --account {account_name} --test")
         return True
-    else:
-        print("\nOAuth setup cancelled or failed.")
-        return False
 
-
-if __name__ == "__main__":
-    # Test the OAuth setup
-    setup = OAuthSetup()
-    
-    print("OAuth Setup Test")
-    print("================\n")
-    
-    # Check gcloud availability
-    if setup.check_gcloud_installed():
-        print("✓ gcloud CLI is installed")
-    else:
-        print("✗ gcloud CLI is not installed")
-    
-    print("\nTo set up OAuth for an account, run:")
-    print("python gmail_to_markdown.py --setup-account")
+    print("\nOAuth setup cancelled or failed.")
+    return False
