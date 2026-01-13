@@ -6,12 +6,11 @@ Manages multiple Gmail account configurations and provides
 interactive account selection functionality.
 """
 
-import os
 import sys
-import json
+
 import yaml
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 
 class AccountManager:
@@ -106,75 +105,48 @@ class AccountManager:
         with open(self.config_file, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
     
-    def add_account(self, nickname: str, email: str, description: str = "",
-                   credentials_file: Optional[str] = None,
-                   token_file: Optional[str] = None) -> None:
-        """Add a new account configuration.
-        
-        Args:
-            nickname: Short identifier for the account
-            email: Gmail email address
-            description: Optional description of the account
-            credentials_file: Path to OAuth credentials JSON
-            token_file: Path to store authentication token
-        """
-        if not credentials_file:
-            credentials_file = f'credentials/{nickname}_credentials.json'
-        if not token_file:
-            token_file = f'tokens/{nickname}_token.json'
-        
+    def add_account(
+        self,
+        nickname: str,
+        email: str,
+        description: str = "",
+        credentials_file: Optional[str] = None,
+        token_file: Optional[str] = None
+    ) -> None:
+        """Add a new account configuration."""
         self.accounts[nickname] = {
             'email': email,
             'description': description,
-            'credentials_file': credentials_file,
-            'token_file': token_file
+            'credentials_file': credentials_file or f'credentials/{nickname}_credentials.json',
+            'token_file': token_file or f'tokens/{nickname}_token.json'
         }
-        
         self.save_accounts()
     
     def get_account(self, nickname: str) -> Optional[Dict[str, Any]]:
-        """Get account configuration by nickname.
-        
-        Args:
-            nickname: Account nickname
-            
-        Returns:
-            Account configuration dict or None if not found
-        """
+        """Get account configuration by nickname."""
         return self.accounts.get(nickname)
-    
+
     def list_accounts(self) -> List[str]:
-        """Get list of configured account nicknames.
-        
-        Returns:
-            List of account nicknames
-        """
+        """Get list of configured account nicknames."""
         return list(self.accounts.keys())
     
     def get_account_display_info(self) -> List[Dict[str, str]]:
         """Get display information for all accounts.
-        
+
         Returns:
             List of dicts with nickname, email, and description
         """
-        info = []
-        for nickname, config in self.accounts.items():
-            info.append({
+        return [
+            {
                 'nickname': nickname,
                 'email': config.get('email', 'Unknown'),
                 'description': config.get('description', '')
-            })
-        return info
+            }
+            for nickname, config in self.accounts.items()
+        ]
     
     def select_accounts_interactive(self, allow_all: bool = True) -> List[str]:
-        """Interactive account selection menu.
-        
-        Args:
-            allow_all: Whether to allow "All accounts" option
-            
-        Returns:
-            List of selected account nicknames
-        """
+        """Interactive account selection menu."""
         if not self.accounts:
             print("\nNo accounts configured. Please run --setup-account first.")
             return []
@@ -215,14 +187,7 @@ class AccountManager:
         return selected
     
     def remove_account(self, nickname: str) -> bool:
-        """Remove an account configuration.
-        
-        Args:
-            nickname: Account nickname to remove
-            
-        Returns:
-            True if account was removed, False if not found
-        """
+        """Remove an account configuration."""
         if nickname in self.accounts:
             # Get file paths before removing
             config = self.accounts[nickname]
@@ -248,22 +213,15 @@ class AccountManager:
         
         return False
     
-    def validate_account(self, nickname: str) -> Dict[str, bool]:
-        """Validate account configuration files exist.
-        
-        Args:
-            nickname: Account nickname to validate
-            
-        Returns:
-            Dict with validation results
-        """
+    def validate_account(self, nickname: str) -> Dict[str, Any]:
+        """Validate account configuration files exist."""
         config = self.get_account(nickname)
         if not config:
             return {'exists': False}
-        
+
         creds_file = Path(config.get('credentials_file', ''))
         token_file = Path(config.get('token_file', ''))
-        
+
         return {
             'exists': True,
             'has_credentials': creds_file.exists(),
@@ -331,24 +289,3 @@ def setup_account_interactive(manager: AccountManager) -> Optional[str]:
     print(f"Run: python gmail_to_markdown.py --setup-oauth {nickname}")
     
     return nickname
-
-
-if __name__ == "__main__":
-    # Test the account manager
-    manager = AccountManager()
-    
-    print("Account Manager Test")
-    print("===================")
-    
-    # List accounts
-    accounts = manager.list_accounts()
-    if accounts:
-        print(f"\nConfigured accounts: {', '.join(accounts)}")
-        
-        # Test interactive selection
-        selected = manager.select_accounts_interactive()
-        if selected:
-            print(f"Selected accounts: {', '.join(selected)}")
-    else:
-        print("\nNo accounts configured.")
-        print("Run 'python gmail_to_markdown.py --setup-account' to add an account.")
