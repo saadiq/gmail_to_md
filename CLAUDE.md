@@ -46,41 +46,39 @@ Gmail to Markdown Exporter - A Python tool that extracts emails from Gmail and c
 
 ### Setup and Installation
 
-```bash
-# Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate  # macOS/Linux
+This project uses `uv` for dependency management. No manual setup required - `uv run` automatically creates a virtual environment and installs dependencies on first run.
 
-# Install dependencies
-pip install -r requirements.txt
+```bash
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ### Running the Tool
 
 ```bash
 # Basic usage - export emails from/to an address (last 30 days)
-python gmail_to_markdown.py --email user@example.com --days 30
+uv run gmail_to_markdown.py --email user@example.com --days 30
 
 # Export ALL emails from/to an address (no date limit)
-python gmail_to_markdown.py --email user@example.com
+uv run gmail_to_markdown.py --email user@example.com
 
 # Test mode - preview without exporting
-python gmail_to_markdown.py --email user@example.com --days 7 --test
+uv run gmail_to_markdown.py --email user@example.com --days 7 --test
 
 # Advanced Gmail query (no date limit)
-python gmail_to_markdown.py --query "from:@company.com has:attachment"
+uv run gmail_to_markdown.py --query "from:@company.com has:attachment"
 
 # Gmail query with date limit
-python gmail_to_markdown.py --query "from:@company.com has:attachment" --days 30
+uv run gmail_to_markdown.py --query "from:@company.com has:attachment" --days 30
 
 # Keep quoted text in replies
-python gmail_to_markdown.py --email user@example.com --days 30 --keep-quotes
+uv run gmail_to_markdown.py --email user@example.com --days 30 --keep-quotes
 
 # Download all images (attachments and inline)
-python gmail_to_markdown.py --email user@example.com --days 30 --download-images
+uv run gmail_to_markdown.py --email user@example.com --days 30 --download-images
 
 # Download with custom size limit
-python gmail_to_markdown.py --query "has:attachment" --days 7 --download-images --image-size-limit 20
+uv run gmail_to_markdown.py --query "has:attachment" --days 7 --download-images --image-size-limit 20
 ```
 
 ### Common Query Patterns

@@ -18,27 +18,22 @@ Export emails from Gmail and convert them to Markdown files with full metadata p
 
 ### Prerequisites
 
-1. Python 3.7 or higher
-2. A Google account with Gmail
-3. Google Cloud project with Gmail API enabled (see setup below)
+1. Python 3.10 or higher
+2. [uv](https://docs.astral.sh/uv/) - Fast Python package manager
+3. A Google account with Gmail
+4. Google Cloud project with Gmail API enabled (see setup below)
 
 ### Installation
 
 ```bash
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Clone or download this project
 git clone <your-repo-url>
 cd gmail_to_md
 
-# Create virtual environment
-python3 -m venv venv
-
-# Activate virtual environment
-source venv/bin/activate  # On macOS/Linux
-# or
-venv\Scripts\activate  # On Windows
-
-# Install dependencies
-pip install -r requirements.txt
+# That's it! uv run automatically creates a venv and installs dependencies
 ```
 
 ### Gmail OAuth Setup
@@ -123,19 +118,19 @@ When you first run the tool:
 
 ```bash
 # Export emails from/to a specific address (last 7 days)
-python gmail_to_markdown.py --email alice@example.com --days 7
+uv run gmail_to_markdown.py --email alice@example.com --days 7
 
 # Export ALL emails from/to a specific address (no date limit)
-python gmail_to_markdown.py --email alice@example.com
+uv run gmail_to_markdown.py --email alice@example.com
 
 # Test mode - preview what would be exported
-python gmail_to_markdown.py --email bob@example.com --days 30 --test
+uv run gmail_to_markdown.py --email bob@example.com --days 30 --test
 
 # Use Gmail's search syntax directly (no date limit)
-python gmail_to_markdown.py --query "from:newsletter@example.com"
+uv run gmail_to_markdown.py --query "from:newsletter@example.com"
 
 # Combine with --days for convenience
-python gmail_to_markdown.py --query "from:newsletter@example.com" --days 30
+uv run gmail_to_markdown.py --query "from:newsletter@example.com" --days 30
 ```
 
 ### Gmail Search Syntax
@@ -144,25 +139,25 @@ The `--query` parameter accepts any Gmail search operator:
 
 ```bash
 # Emails from specific sender
-python gmail_to_markdown.py --query "from:alice@example.com" --days 7
+uv run gmail_to_markdown.py --query "from:alice@example.com" --days 7
 
 # Emails from a domain
-python gmail_to_markdown.py --query "from:@company.com" --days 14
+uv run gmail_to_markdown.py --query "from:@company.com" --days 14
 
 # Complex OR queries
-python gmail_to_markdown.py --query "(from:alice@example.com OR from:bob@example.com)" --days 30
+uv run gmail_to_markdown.py --query "(from:alice@example.com OR from:bob@example.com)" --days 30
 
 # Emails with attachments
-python gmail_to_markdown.py --query "has:attachment" --days 7
+uv run gmail_to_markdown.py --query "has:attachment" --days 7
 
 # Combine multiple conditions
-python gmail_to_markdown.py --query "from:@company.com subject:invoice has:attachment" --days 60
+uv run gmail_to_markdown.py --query "from:@company.com subject:invoice has:attachment" --days 60
 
 # Exclude certain terms
-python gmail_to_markdown.py --query "from:newsletter@example.com -unsubscribe" --days 7
+uv run gmail_to_markdown.py --query "from:newsletter@example.com -unsubscribe" --days 7
 
 # Unread emails with specific label
-python gmail_to_markdown.py --query "is:unread label:important" --days 3
+uv run gmail_to_markdown.py --query "is:unread label:important" --days 3
 ```
 
 ### Gmail Search Operators Reference
@@ -190,10 +185,10 @@ Use `--test` to preview emails without exporting:
 
 ```bash
 # See what emails would be exported
-python gmail_to_markdown.py --email alice@example.com --days 7 --test
+uv run gmail_to_markdown.py --email alice@example.com --days 7 --test
 
 # Test complex queries
-python gmail_to_markdown.py --query "(from:@company.com OR from:@partner.com) has:attachment" --days 30 --test
+uv run gmail_to_markdown.py --query "(from:@company.com OR from:@partner.com) has:attachment" --days 30 --test
 ```
 
 Test mode output:
@@ -287,13 +282,13 @@ Welcome to this week's newsletter...
 
 ```bash
 # Download all images (attachments and inline images)
-python gmail_to_markdown.py --email colleague@company.com --days 30 --download-images
+uv run gmail_to_markdown.py --email colleague@company.com --days 30 --download-images
 
 # Download images with size limit
-python gmail_to_markdown.py --query "has:attachment" --days 7 --download-images --image-size-limit 20
+uv run gmail_to_markdown.py --query "has:attachment" --days 7 --download-images --image-size-limit 20
 
 # Export without images (default behavior)
-python gmail_to_markdown.py --email newsletter@example.com --days 30
+uv run gmail_to_markdown.py --email newsletter@example.com --days 30
 ```
 
 When using `--download-images`:
@@ -307,7 +302,7 @@ When using `--download-images`:
 
 ```bash
 # Email filter + custom query
-python gmail_to_markdown.py --email alice@example.com --query "has:attachment" --days 30
+uv run gmail_to_markdown.py --email alice@example.com --query "has:attachment" --days 30
 
 # This creates: "(from:alice@example.com OR to:alice@example.com) (has:attachment) after:2025/01/01"
 ```
@@ -316,37 +311,37 @@ python gmail_to_markdown.py --email alice@example.com --query "has:attachment" -
 
 ```bash
 # Export all emails in conversations with someone (last 90 days)
-python gmail_to_markdown.py --email colleague@company.com --days 90
+uv run gmail_to_markdown.py --email colleague@company.com --days 90
 
 # Export ALL emails ever exchanged with someone
-python gmail_to_markdown.py --email colleague@company.com
+uv run gmail_to_markdown.py --email colleague@company.com
 ```
 
 ### Archive Newsletters
 
 ```bash
 # Export newsletters, excluding unsubscribe footers
-python gmail_to_markdown.py --query "from:newsletter@example.com -unsubscribe" --days 30
+uv run gmail_to_markdown.py --query "from:newsletter@example.com -unsubscribe" --days 30
 ```
 
 ### Quote Handling
 
 ```bash
 # Default: Export emails WITHOUT quoted text (clean, readable)
-python gmail_to_markdown.py --email colleague@company.com --days 30
+uv run gmail_to_markdown.py --email colleague@company.com --days 30
 
 # Keep full email threads with all quotes
-python gmail_to_markdown.py --email colleague@company.com --days 30 --keep-quotes
+uv run gmail_to_markdown.py --email colleague@company.com --days 30 --keep-quotes
 
 # Useful for preserving complete context
-python gmail_to_markdown.py --query "subject:RE OR subject:Re" --days 7 --keep-quotes
+uv run gmail_to_markdown.py --query "subject:RE OR subject:Re" --days 7 --keep-quotes
 ```
 
 ### Export by Label
 
 ```bash
 # Export all emails with specific label
-python gmail_to_markdown.py --query "label:project-x" --days 365
+uv run gmail_to_markdown.py --query "label:project-x" --days 365
 ```
 
 ## Troubleshooting
@@ -389,7 +384,7 @@ python gmail_to_markdown.py --query "label:project-x" --days 365
 **Check your query**
 ```bash
 # Test with a simple query first
-python gmail_to_markdown.py --email your@email.com --days 30 --test
+uv run gmail_to_markdown.py --email your@email.com --days 30 --test
 
 # Verify in Gmail web interface
 # Copy the query from the script output and paste it in Gmail search
