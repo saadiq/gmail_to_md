@@ -312,12 +312,12 @@ def save_email_to_file(
 
         if email_data.get('attachments'):
             saved_images.extend(
-                save_attachments(email_data['attachments'], attachments_dir, image_size_limit_mb)
+                save_attachments(email_data['attachments'], attachments_dir, folder_path, image_size_limit_mb)
             )
 
         if email_data.get('inline_images'):
             saved_images.extend(
-                save_inline_images(email_data['inline_images'], inline_images_dir)
+                save_inline_images(email_data['inline_images'], inline_images_dir, folder_path)
             )
 
     file_path.write_text(markdown_content, encoding='utf-8')

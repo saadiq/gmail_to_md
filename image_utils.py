@@ -89,6 +89,7 @@ def save_binary_file(
 def save_image_file(
     image_info: Dict,
     dest_dir: Path,
+    base_folder: Path,
     size_limit_mb: int = 10,
     description: str = "image"
 ) -> Tuple[Optional[Path], Optional[str]]:
@@ -97,6 +98,7 @@ def save_image_file(
     Args:
         image_info: Dict with 'filename', 'data', and optionally 'size'
         dest_dir: Directory to save to
+        base_folder: Base folder for computing relative paths
         size_limit_mb: Maximum file size in MB
         description: Description for error messages
 
@@ -119,7 +121,8 @@ def save_image_file(
 
     saved_path = save_binary_file(image_info['data'], dest_path, description)
     if saved_path:
-        return saved_path, saved_path.name
+        rel_path = str(saved_path.relative_to(base_folder))
+        return saved_path, rel_path
 
     return None, None
 
@@ -127,6 +130,7 @@ def save_image_file(
 def save_attachments(
     attachments: List[Dict],
     attachments_dir: Path,
+    base_folder: Path,
     size_limit_mb: int = 10
 ) -> List[Path]:
     """Save email attachments to directory.
@@ -134,6 +138,7 @@ def save_attachments(
     Args:
         attachments: List of attachment info dicts
         attachments_dir: Directory to save attachments
+        base_folder: Base folder for computing relative paths
         size_limit_mb: Maximum file size in MB
 
     Returns:
@@ -145,6 +150,7 @@ def save_attachments(
         saved_path, rel_path = save_image_file(
             att,
             attachments_dir,
+            base_folder,
             size_limit_mb,
             f"attachment {att.get('filename', 'unknown')}"
         )
@@ -157,13 +163,15 @@ def save_attachments(
 
 def save_inline_images(
     inline_images: Dict[str, Dict],
-    images_dir: Path
+    images_dir: Path,
+    base_folder: Path
 ) -> List[Path]:
     """Save inline images to directory.
 
     Args:
         inline_images: Dict mapping Content-ID to image info
         images_dir: Directory to save images
+        base_folder: Base folder for computing relative paths
 
     Returns:
         List of paths to saved files
@@ -174,6 +182,7 @@ def save_inline_images(
         saved_path, rel_path = save_image_file(
             img_info,
             images_dir,
+            base_folder,
             size_limit_mb=100,  # No practical limit for inline images
             description=f"inline image {cid}"
         )
