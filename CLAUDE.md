@@ -53,6 +53,20 @@ This project uses `uv` for dependency management. No manual setup required - `uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
+### Non-Interactive Usage (Claude Code / Scripts)
+
+The tool defaults to an interactive account selection menu, which fails in non-interactive environments (Claude Code, CI, piped scripts). Always use `-a ACCOUNT` or `--all` to specify the account explicitly:
+
+```bash
+# Use -a to skip interactive account selection
+uv run gmail_to_markdown.py -a gmail --query "from:user@example.com" --days 7
+
+# Use --list to see available account names
+uv run gmail_to_markdown.py --list
+```
+
+**Important: `--keep-quotes` for inline replies.** By default, quoted text is stripped. This destroys inline responses (where someone replies between your original lines). Use `--keep-quotes` when the reply may contain interleaved/inline responses.
+
 ### Running the Tool
 
 ```bash
